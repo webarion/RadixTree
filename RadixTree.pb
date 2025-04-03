@@ -4,26 +4,28 @@
 ; ░█▀▄░█▀█░█░█░░█░░▄▀▄░░░░█░░█▀▄░█▀▀░█▀▀
 ; ░▀░▀░▀░▀░▀▀░░▀▀▀░▀░▀░░░░▀░░▀░▀░▀▀▀░▀▀▀
 
+; Description .: Implementation of the Radix Tree algorithm for Purebasic
+;              : Реализация алгоритма Radix Tree для PureBasic
 ; Author ......: Webarion
 ; Link ........: https://github.com/webarion/RadixTree/blob/main/RadixTree.pb
 ; License .....: Free license, do what you want! Свободная лицензия, делай то, что хочешь!
-; Version .....: 1.1
-; Note ........: This standard Radix Tree algorithm does not have sorting in alphabetical order, while it is very fast.
-; Примечание ..: Это стандартный алгоритм Radix Tree, не имеет сортировки в алфавитном порядке, при этом является очень быстрым.
+; Version .....: 1.2
 
-; History:
+
+;- History:
+;   v1.2 - Small code adjustments are made.
 ;   v1.1 - Some corrections, optimization are made. Added the procedure for removing the key.
-;          Сделана, небольшая оптимизация. Добавлена процедура удаления ключа.
-;   v1.0 - The first published version. Первая опубликованная версия
+;   v1.0 - The first published version.
+
+; История версий:
+;   v1.2 - Сделаны небольшие корректировки кода.
+;   v1.1 - Сделана, небольшая оптимизация. Добавлена процедура удаления ключа.
+;   v1.0 - Первая опубликованная версия
 
 
 DeclareModule RadixTree
   
   EnableExplicit 
-  
-  ; This is mainly for tests. If you need a tree depth for something, install Constant in #true
-  ; В основном, это для тестов. Если вам для чего-то нужна глубина дерева, установите константу в #True
-  #RadixTree_Enable_Procedure_Depth = #False 
   
   ;- Available to the user structure. Доступные для пользователя структуры
   
@@ -35,18 +37,22 @@ DeclareModule RadixTree
   
   ;- DECLARES of user procedures and a short description. Объявление пользовательских процедур и короткое описание
   
-  Declare New()                      ; Creates a new Radix Tree.              Создаёт новый Radix Tree
-  Declare Free( *Root )              ; Frees the entire memory of Radix Tree. Освобождает всю память Radix Tree
-  Declare Set( *Root, Key$, *Value ) ; Writes key data to Radix Tree.         Записывает данные ключа в Radix Tree
-  Declare Get( *Root, Key$         ) ; Returns the key data.                  Возвращает данные ключа
-  Declare Delete( *Root, Key$ )      ; Removes the key from Radix Tree.       Удаляет ключ из Radix Tree
-  Declare CountKeys( *Root )         ; Returns the number of keys existing in Radix Tree. Возвращает количество ключей, существующих в Radix Tree
-  Declare PrefixList( *Root, Prefix$, List Key.Key() ) ; Gets the keys to the prefix. Получает ключи по префиксу
-  Declare AllKeys( *Root, List Key.Key() ) ; He gets all the keys. Получает все ключи.  
-
-  CompilerIf #RadixTree_Enable_Procedure_Depth
+  Declare   New()                      ; Creates a new Radix Tree.              Создаёт новый Radix Tree
+  Declare   Free( *Root )              ; Frees the entire memory of Radix Tree. Освобождает всю память Radix Tree
+  Declare   Set( *Root, Key$, *Value ) ; Writes key data to Radix Tree.         Записывает данные ключа в Radix Tree
+  Declare   Get( *Root, Key$         ) ; Returns the key data.                  Возвращает данные ключа
+  Declare   Delete( *Root, Key$ )      ; Removes the key from Radix Tree.       Удаляет ключ из Radix Tree
+  Declare   CountKeys( *Root )         ; Returns the number of keys existing in Radix Tree. Возвращает количество ключей, существующих в Radix Tree
+  Declare.a PrefixList( *Root, Prefix$, List Key.Key() ) ; Gets the keys to the prefix. Получает ключи по префиксу
+  Declare   AllKeys( *Root, List Key.Key() ) ; He gets all the keys. Получает все ключи 
+  
+  
+  ; This is mainly for tests. If you need a tree depth for something, install #radixtree_enable_procedure_depth = 1, in the compiler settings
+  ; В основном, это для тестов. Если вам для чего-то нужна глубина дерева, установите #RadixTree_Enable_Procedure_Depth = 1, в настройках компилятора
+  CompilerIf Defined( RadixTree_Enable_Procedure_Depth, #PB_Constant )
     Declare Depth( *Root ) ; Returns the depth of Radix Tree from the specified node. Возвращает глубину Radix Tree от указанного узла
   CompilerEndIf
+
   
 EndDeclareModule
 
@@ -59,9 +65,9 @@ Module RadixTree
     c.c[0]
   EndStructure
   
-  Structure RadixTree
-    *Child.RadixTree   
-    *Next.RadixTree
+  Structure Node
+    *Child.Node   
+    *Next.Node
     *Value
     Pref$
   EndStructure
@@ -71,7 +77,7 @@ Module RadixTree
   
   
   ; Внутренняя рекурсивная процедура для сбора всех ключей, начиная с указанного узла
-  Procedure _CollectKeys( *Node.RadixTree, List Key.Key(), CurrentPrefix$ = "" )
+  Procedure _CollectKeys( *Node.Node, List Key.Key(), CurrentPrefix$ = "" )
     While *Node
       Protected FullPrefix$ = CurrentPrefix$ + *Node\Pref$
       If *Node\Value
@@ -91,7 +97,7 @@ Module RadixTree
   ; Creates a new root node Radix Tree and returns the pointer to it
   ; Создаёт новый корневой узел Radix Tree и возвращает указатель на него
   Procedure New()
-    Protected *New.RadixTree = AllocateStructure(RadixTree)
+    Protected *New.Node = AllocateStructure(Node)
     *New\Pref$ = ""
     ProcedureReturn *New
   EndProcedure
@@ -99,8 +105,8 @@ Module RadixTree
   
   ; Writes the key data in Radix Tree
   ; Записывает данные ключа в Radix Tree
-  Procedure Set( *Node.RadixTree, Key$, *Value )
-    If Not *Value : Delete( *Node, Key$ ) : EndIf
+  Procedure Set( *Node.Node, Key$, *Value )
+    If Not *Value : ProcedureReturn : EndIf
     Key$ = LCase(Key$)
     Protected *SearchPref.Symbol = @Key$
     
@@ -130,19 +136,20 @@ Module RadixTree
               *SearchPref = @*SearchPref\c[i]
               Continue
             Else ; дочернего нет, создаём и записываем
-              *Node\Child = AllocateStructure(RadixTree)
+              *Node\Child = AllocateStructure(Node)
               *Node\Child\Pref$ = PeekS( @*SearchPref\c[i] ) ; в дочерний, записывается правая часть искомого префикса
               *Node\Child\Value = *Value
             EndIf
             
-          Else ; ключ найден, обновляем данные
+          Else ; ключ уже существует, обновляем данные
             *Node\Value = *Value 
+            ProcedureReturn
           EndIf
           
           ProcedureReturn
         Else ; существующий префикс не закончен 
           
-          Protected *New.RadixTree = AllocateStructure(RadixTree)
+          Protected *New.Node = AllocateStructure(Node)
           *New\Pref$  = PeekS( @*ExistingPref\c[i] ) ; записывается правая часть существующего префикса
           *New\Value  = *Node\Value   
           If *Node\Child ; есть дочерний
@@ -152,7 +159,7 @@ Module RadixTree
           *Node\Pref$  = PeekS( *ExistingPref, i ) ; записывается левая часть существующего префикса
           *Node\Value  = 0  
           If *SearchPref\c[i] ; искомый префикс не закончен
-            *New        = AllocateStructure(RadixTree)
+            *New        = AllocateStructure(Node)
             *New\Pref$  = PeekS( @*SearchPref\c[i] ) ; записывается правая часть искомого префикса
             *New\Value  = *Value
             *New\Next   = *Node\Child
@@ -162,19 +169,18 @@ Module RadixTree
           EndIf
           
           ProcedureReturn
-          
         EndIf
         
       Else ; узел не найден, а *Node указывает на последний узел в текущей Next последовательности узлов
         
         If *Node\Pref$ ; если у узла есть ключ, то это не корневой узел, в ином случае запись в корень, без создания структуры
-          *Node\Next = AllocateStructure(RadixTree)
+          *Node\Next = AllocateStructure(Node)
           *Node = *Node\Next
         EndIf
         *Node\Pref$ = PeekS( *SearchPref )
         *Node\Value = *Value
-        ProcedureReturn
         
+        ProcedureReturn
       EndIf
       
     Wend
@@ -184,7 +190,7 @@ Module RadixTree
   
   ; Returns the key data
   ; Возвращает данные ключа
-  Procedure Get( *Node.RadixTree, Key$ )
+  Procedure Get( *Node.Node, Key$ )
     Key$ = LCase(Key$)
     Protected *SearchPref.Symbol = @Key$
     
@@ -211,24 +217,27 @@ Module RadixTree
             ProcedureReturn *Node\Value
           EndIf
         Else
-          ProcedureReturn #Null
+          ProcedureReturn 0
         EndIf
       Else ; не найдено
-        ProcedureReturn #Null
+        ProcedureReturn 0
       EndIf
       
     Wend
     
-    ProcedureReturn #Null
+    ProcedureReturn 0
   EndProcedure
   
   
-  ; Removes the key. Удаляет ключ
-  Procedure Delete( *Node.RadixTree, Key$ )
+  ; Removes the key, will return 1 in case of successful removal of the key and 0 - if the key does not exist.
+  
+  ; Удаляет ключ, и возвращает данные удалённого ключа. Если ключа не существовало, возвращает 0.
+  
+  Procedure Delete( *Node.Node, Key$ )
     Key$ = LCase(Key$)
     Protected *SearchPref.Symbol = @Key$
-    Protected *Parent.RadixTree = #Null
-    Protected *Prev.RadixTree = #Null
+    Protected *Parent.Node = 0
+    Protected *Prev.Node = 0
     While *SearchPref\c
       ; Поиск узла с совпадающим первым символом
       While *Node
@@ -251,11 +260,12 @@ Module RadixTree
             *SearchPref = @*SearchPref\c[i]
             Continue
           Else ; Ключ найден
-            If *Node\Child ; Если есть дочерние узлы, просто обнуляем Value
+            If *Node\Child ; Если есть дочерние узлы обнуляем Value
               If *Node\Value ; это ключ
+                Protected *Return = *Node\Value
                 *Node\Value = 0
-              Else ; а это просто узел
-                ProcedureReturn #False
+              Else ; а это пустой узел
+                ProcedureReturn 0
               EndIf
             Else ; Если дочерних узлов нет, удаляем узел
               If *Parent
@@ -289,7 +299,7 @@ Module RadixTree
   
   ; Frees the entire memory of Radix Tree. *Node - pointer to the root node
   ; Освобождает всю память Radix Tree. *Node - указатель на корневой узел
-  Procedure Free( *Node.RadixTree )
+  Procedure Free( *Node.Node )
     While *Node
       Free( *Node\Child )
       Protected *Next = *Node\Next
@@ -301,7 +311,7 @@ Module RadixTree
   
   ; Gets all the keys Radix Tree
   ; Получает все ключи Radix Tree
-  Procedure AllKeys( *Root.RadixTree, List Key.Key() )
+  Procedure AllKeys( *Root.Node, List Key.Key() )
     ClearList( Key() )
     _CollectKeys( *Root, Key() )
   EndProcedure
@@ -309,7 +319,7 @@ Module RadixTree
   
   ; Gets the keys to the prefix
   ; Получает ключи по префиксу 
-  Procedure PrefixList( *Node.RadixTree, Prefix$, List Key.Key() )
+  Procedure.a PrefixList( *Node.Node, Prefix$, List Key.Key() )
     Protected FirstChars$ = ""
     Prefix$ = LCase(Prefix$)
     Protected *SearchPref.Symbol = @Prefix$
@@ -344,7 +354,7 @@ Module RadixTree
   
   ; Returns the number of keys existing in Radix Tree
   ; Возвращает количество ключей, существующих в Radix Tree
-  Procedure CountKeys( *Node.RadixTree )
+  Procedure CountKeys( *Node.Node )
     Protected Count = 0
     While *Node 
       If *Node\Value
@@ -359,10 +369,10 @@ Module RadixTree
   EndProcedure
   
   
-  CompilerIf #RadixTree_Enable_Procedure_Depth
+  CompilerIf Defined( RadixTree_Enable_Procedure_Depth, #PB_Constant )
     ; Returns the depth of Radix Tree
     ; Возвращает глубину Radix Tree
-    Procedure Depth( *Node.RadixTree )
+    Procedure Depth( *Node.Node )
       Protected Depth = 1, ChildDepth = 0
       While *Node
         If *Node\Child
@@ -373,10 +383,7 @@ Module RadixTree
       ProcedureReturn Depth + ChildDepth
     EndProcedure
   CompilerEndIf
-  
-  
 
-  
   
   DisableExplicit
   
@@ -424,7 +431,7 @@ CompilerIf #PB_Compiler_IsMainFile
   
   Debug "Count keys: " + RadixTree::CountKeys( *Root ) ; The number of keys. Количество ключей
   
-  CompilerIf RadixTree::#RadixTree_Enable_Procedure_Depth
+  CompilerIf Defined( RadixTree_Enable_Procedure_Depth, #PB_Constant )
     Debug "Depth: " + RadixTree::Depth( *Root )  ; The depth of the tree. Глубина дерева.
   CompilerEndIf
   
@@ -449,11 +456,7 @@ CompilerIf #PB_Compiler_IsMainFile
   EndIf
   ; Проверка удаления
   Debug "Get key '" + DelKey$ + "': " + RadixTree::Get( *Root, DelKey$ )
-  
-  ; Also, you can delete the key using Radixtree :: Set ( *Root, "Key", 0), but it should be noted that the SET procedure does not return the result of the work. 
-  ; If you need a removal result, use Radixtree :: Delete ( *Root, Delkey ​​$)
-  ; также, удалить ключ можно с помощью  RadixTree::Set( *Root, "Key", 0 ) , но следует учесть, что процедура Set, не возвращает результат работы. 
-  ; Если нужен результат удаления, используйте RadixTree::Delete( *Root, DelKey$ ) 
+
   
   ;--    Get all keys. Список всех ключей
   Debug "----- AllKeys: "
@@ -461,10 +464,7 @@ CompilerIf #PB_Compiler_IsMainFile
   ForEach ListRT()
     Debug "     " + ListRT()\Key$ + " = " + Str( ListRT()\Value )
   Next 
-  
-;   ;  For development. Для разработки.
-;   XIncludeFile "..\DrawAlg\DrawAlg.pb" 
-;   DrawAlg::Demo_RadixTree( *Root )
+
   
   ;--    Free the Radix Tree memory. Освобождение памяти Radix Tree.
   RadixTree::Free( *Root )
