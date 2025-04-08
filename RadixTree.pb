@@ -9,15 +9,17 @@
 ; Author ......: Webarion
 ; Link ........: https://github.com/webarion/RadixTree/blob/main/RadixTree.pb
 ; License .....: Free license, do what you want! Свободная лицензия, делай то, что хочешь!
-; Version .....: 1.2
+; Version .....: 1.3
 
 
 ;- History:
+;   v1.3 - In the Delete procedure, a error with the absence of a returned value of a remote key is fixed. An example of removal is updated.
 ;   v1.2 - Small code adjustments are made.
 ;   v1.1 - Some corrections, optimization are made. Added the procedure for removing the key.
 ;   v1.0 - The first published version.
 
 ; История версий:
+;   v1.3 - В процедуре Delete, исправлена ошибка с отсутствием возвращаемого параметра удалённого ключа. Обновлён пример удаления.
 ;   v1.2 - Сделаны небольшие корректировки кода.
 ;   v1.1 - Сделана, небольшая оптимизация. Добавлена процедура удаления ключа.
 ;   v1.0 - Первая опубликованная версия
@@ -44,7 +46,7 @@ DeclareModule RadixTree
   Declare   Delete( *Root, Key$ )      ; Removes the key from Radix Tree.       Удаляет ключ из Radix Tree
   Declare   CountKeys( *Root )         ; Returns the number of keys existing in Radix Tree. Возвращает количество ключей, существующих в Radix Tree
   Declare.a PrefixList( *Root, Prefix$, List Key.Key() ) ; Gets the keys to the prefix. Получает ключи по префиксу
-  Declare   AllKeys( *Root, List Key.Key() ) ; He gets all the keys. Получает все ключи 
+  Declare   AllKeys( *Root, List Key.Key() )             ; He gets all the keys. Получает все ключи 
   
   
   ; This is mainly for tests. If you need a tree depth for something, install #radixtree_enable_procedure_depth = 1, in the compiler settings
@@ -52,7 +54,7 @@ DeclareModule RadixTree
   CompilerIf Defined( RadixTree_Enable_Procedure_Depth, #PB_Constant )
     Declare Depth( *Root ) ; Returns the depth of Radix Tree from the specified node. Возвращает глубину Radix Tree от указанного узла
   CompilerEndIf
-
+  
   
 EndDeclareModule
 
@@ -260,9 +262,10 @@ Module RadixTree
             *SearchPref = @*SearchPref\c[i]
             Continue
           Else ; Ключ найден
+            Protected *ReturnVal = 0
             If *Node\Child ; Если есть дочерние узлы обнуляем Value
               If *Node\Value ; это ключ
-                Protected *Return = *Node\Value
+                *ReturnVal = *Node\Value
                 *Node\Value = 0
               Else ; а это пустой узел
                 ProcedureReturn 0
@@ -281,9 +284,10 @@ Module RadixTree
                   *Node = *Node\Next
                 EndIf
               EndIf
+              *ReturnVal = *Node\Value
               FreeStructure(*Node)
             EndIf
-            ProcedureReturn #True
+            ProcedureReturn *ReturnVal
           EndIf
         Else
           ProcedureReturn #False
@@ -346,7 +350,7 @@ Module RadixTree
           ProcedureReturn #True
         EndIf
       EndIf
-      *Node = *Node\Next ; к следующему символу в текущей *Next последовательности префиксов
+      *Node = *Node\Next ; к следующей текущей *Next последовательности префиксов
     Wend
     ProcedureReturn #False
   EndProcedure
@@ -383,7 +387,7 @@ Module RadixTree
       ProcedureReturn Depth + ChildDepth
     EndProcedure
   CompilerEndIf
-
+  
   
   DisableExplicit
   
@@ -446,17 +450,39 @@ CompilerIf #PB_Compiler_IsMainFile
   Next 
   
   
-  ;--    Removing the key. Удаление ключа
-  Debug "----- Delete key: "
-  Define DelKey$ = "Rubicon"
-  If RadixTree::Delete( *Root, DelKey$ )
-    Debug "The key '" + DelKey$ + "' is deleted"  
-  Else
-    Debug "Key '" + DelKey$ + "' was not found"
-  EndIf
-  ; Проверка удаления
-  Debug "Get key '" + DelKey$ + "': " + RadixTree::Get( *Root, DelKey$ )
+  ;--    An example of removing the key. Пример удаления ключа.
+  Debug "----- Example Delete key: " 
+  
+  Structure MyTestObject
+    ID.i
+  EndStructure
+  
+  Procedure New_MyTestObject(ID)
+    Protected *MyTestObject.MyTestObject = AllocateStructure(MyTestObject)
+    *MyTestObject\ID = ID
+    ProcedureReturn *MyTestObject
+  EndProcedure
+  
+  ; Create the key that we will delete. Создаём ключ, который будем удалять
+  RadixTree::Set( *Root, "Romantic", New_MyTestObject(209) ) 
+  Debug "Key 'Romantic' = " + RadixTree::Get( *Root, "Romantic" )
+  
+  ; When removing, we get a pointer to a test object to free the memory of this object
+  ; При удалении, получаем указатель на тестовый объект, чтобы освободить память этого объекта
+  Define *MyTestObject = RadixTree::Delete( *Root, "Romantic" )
 
+  If *MyTestObject
+    FreeStructure(*MyTestObject)
+    Debug "The key 'Romantic' is deleted"  
+  Else
+    Debug "Key Romantic was not found"
+  EndIf
+  
+  Debug "Returned from Delete: " + Str(*MyTestObject)
+  
+  ; Removal check. Проверка удаления
+  Debug "Get key 'Romantic': " + RadixTree::Get( *Root, "Romantic" )
+  
   
   ;--    Get all keys. Список всех ключей
   Debug "----- AllKeys: "
@@ -464,7 +490,7 @@ CompilerIf #PB_Compiler_IsMainFile
   ForEach ListRT()
     Debug "     " + ListRT()\Key$ + " = " + Str( ListRT()\Value )
   Next 
-
+  
   
   ;--    Free the Radix Tree memory. Освобождение памяти Radix Tree.
   RadixTree::Free( *Root )
